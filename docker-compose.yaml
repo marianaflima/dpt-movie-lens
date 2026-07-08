@@ -1,0 +1,69 @@
+version: "3.9"
+
+# Stack fiel ao projeto original (GCS + BigQuery External Tables), usando:
+#   GCS      -> MinIO   (storage compatível com S3)
+#   BigQuery -> DuckDB  (consulta direto no MinIO via extensão httpfs,
+#                        sem duplicar dado — igual a "external tables")
+#   Metabase -> Metabase customizado (imagem Debian + driver DuckDB)
+#
+# Build + subir:  docker compose -f docker-compose.duckdb.yml up -d --build
+# Derrubar:       docker compose -f docker-compose.duckdb.yml down
+
+services:
+
+  # ---------- Storage (equivalente ao GCS) ----------
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+      "
+
+  # ---------- Metabase customizado com driver DuckDB ----------
+  metabase-duckdb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metabase-duckdb
+    ports:
+      - "3000:3000"
+    volumes:
+      # Pasta local compartilhada onde vive o arquivo .duckdb (o "banco").
+      # O mesmo arquivo é usado pelos seus scripts de ETL (fora do container)
+      # e pelo Metabase para leitura.
+      - ./duckdb-data:/data
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    # Depois de subir, acesse http://localhost:3000, crie a conta admin e
+    # adicione uma nova base de dados do tipo "DuckDB":
+    #   Database file: /data/analytics.duckdb
+    # (o arquivo é criado por você via DuckDB CLI/scripts próprios,
+    #  usando a extensão httpfs para ler os CSVs direto do MinIO)
+
+volumes:
+  minio_data:
