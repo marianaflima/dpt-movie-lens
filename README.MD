@@ -35,7 +35,11 @@ Utilizado para:
 5. métricas do dashboard
 
 ---
+## Arquitetura do Pipeline
 
+![](img/architecture.png)
+
+--- 
 ## Decisões técnicas
 
 - No desafio original, pedia o uso de ferramentas do GCP, como o Cloud Storage e o BigQuery e eu adaptei para usar o MinIO junto com o DuckDB para conseguir produzir um resultado semelhante, e montei um arquivo docker-compose para subir três instâncias.
@@ -74,15 +78,15 @@ SET s3_url_style='path';
 - Também criei schemas para organizar melhor o banco:
 
 ```bash
-CREATE SCHEMA raw;
-CREATE SCHEMA silver;
-CREATE SCHEMA gold;
+CREATE SCHEMA IF NOT EXISTS bronze;
+CREATE SCHEMA IF NOT EXISTS silver;
+CREATE SCHEMA IF NOT EXISTS gold;
 ```
 
 4. Para importar os dados e criar o equivalente às external tables do GCS e definir os tipos todos como VARCHAR, eu rodei a query:
 
 ```bash
-CREATE VIEW raw.elicitations AS SELECT * FROM read_csv(
+CREATE OR REPLACE VIEW raw.elicitations AS SELECT * FROM read_csv(
   's3://movie-lens/raw/movie_elicitation_set.csv',
   types = {
     'tstamp':'VARCHAR',
@@ -135,7 +139,7 @@ SELECT view_name FROM duckdb_views;
 - Para a `dim_movies`, meu desafio era obter o ano a partir do título para criar a coluna separada de ano de lançamento, e essa foi a consulta que eu construi:
 
 ```bash
-CREATE TABLE silver.dim_movies (
+CREATE OR REPLACE TABLE silver.dim_movies (
   titulo VARCHAR,
   generos VARCHAR,
   ano_lancamento INTEGER
