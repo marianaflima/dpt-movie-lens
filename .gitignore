@@ -1,1 +1,2 @@
 duckdb-data/*.duckdb
+duckdb-data/*.duckdb.wal
