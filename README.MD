@@ -1,6 +1,6 @@
 # Technical Challenge 01 — Real-world case with BigQuery and Metabase (adapted)
 ---
-For the brazilian portuguese version, ![click here]('pt-br/README.md')
+For the brazilian portuguese version, ![click here](pt-br/README.md)
 ---
 ## **Cloud / Data**
 
