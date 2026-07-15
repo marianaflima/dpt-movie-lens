@@ -1,65 +1,67 @@
-# Desafio técnico 01 — Case real com BigQuery e Metabase (com adaptações)
-
+# Technical Challenge 01 — Real-world case with BigQuery and Metabase (adapted)
+---
+For the brazilian portuguese version, [click here]('pt-br/README.md')
+---
 ## **Cloud / Data**
 
 - **MinIO**
 
-Armazenamento dos arquivos CSV (camada raw).
+Storage for the CSV files (raw layer).
 
 - **DuckDB**
 
-External tables, modelagem analítica, queries SQL e criação de views.
+External tables, analytical modeling, SQL queries, and view creation.
 
-## **BI / Visualização**
+## **BI / Visualization**
 
 - **Metabase**
 
-Ferramenta de Business Intelligence para criação de gráficos e dashboards.
+Business Intelligence tool for building charts and dashboards.
 
-## **Infraestrutura local**
+## **Local infrastructure**
 
 - **Docker**
 
-Utilizado para subir o Metabase, DuckDB e MinIO localmente.
+Used to spin up Metabase, DuckDB, and MinIO locally.
 
-## **Linguagem**
+## **Language**
 
 - **SQL (DuckDB)**
 
-Utilizado para:
+Used for:
 
-1. limpeza de dados
-2. modelagem analítica
-3. criação de tabelas
-4. criação de views
-5. métricas do dashboard
+1. data cleaning
+2. analytical modeling
+3. table creation
+4. view creation
+5. dashboard metrics
 
 ---
-## Arquitetura do Pipeline
+## Pipeline Architecture
 
 ![](img/architecture.png)
 
---- 
-## Decisões técnicas
+---
+## Technical decisions
 
-- No desafio original, pedia o uso de ferramentas do GCP, como o Cloud Storage e o BigQuery e eu adaptei para usar o MinIO junto com o DuckDB para conseguir produzir um resultado semelhante, e montei um arquivo docker-compose para subir três instâncias.
-- A principal motivação foi conseguir fazer o mesmo desafio com o uso de ferramentas open-source / gratuitas em caso de não conseguir cumprir o desafio usando o free tier do GCP
-- Cheguei a começar a implementar o projeto usando PostgreSQL ao invés do DuckDB, mas para o que eu precisava, usar o PostgreSQL não era fiel a infraestrutura original nem eficiente para obter os dados remotamente
-- O único empecilho que eu achei foi no uso conjunto do DuckDB com o Metabase: o banco só pode ser acessado ou pelo Metabase ou pelo CLI/interface, e não os dois ao mesmo tempo, o que é uma limitação conhecida para quem tem que usar Metabase com DuckDB
+- The original challenge asked for GCP tools such as Cloud Storage and BigQuery, and I adapted it to use MinIO together with DuckDB to produce a similar result, putting together a docker-compose file to spin up three instances.
+- The main motivation was to be able to complete the same challenge using open-source / free tools, in case I couldn't get it done within GCP's free tier.
+- I actually started implementing the project using PostgreSQL instead of DuckDB, but for what I needed, PostgreSQL wasn't faithful to the original infrastructure nor efficient for fetching the data remotely.
+- The only real snag I ran into was using DuckDB together with Metabase: the database can only be accessed by either Metabase or the CLI/interface, not both at the same time, which is a known limitation for anyone running Metabase with DuckDB.
 
-## Passo a passo
+## Step by step
 
-### Camada Bronze
+### Bronze Layer
 
-1. Uma vez que subi os contâiners, eu fiz log-in na interface web do MinIO e criei um bucket em `Create Bucket` com o nome `movie-lens`, e criei uma pasta com o nome "raw" no bucket, onde subi os arquivos csv
+1. Once I had the containers up, I logged into the MinIO web interface and created a bucket via `Create Bucket` named `movie-lens`, then created a folder named "raw" inside the bucket, where I uploaded the CSV files.
 
-2. Para conseguir acessar o MinIO pela linha de comando, eu utilizei o seguinte comando no terminal, ao acessar o contâiner do MinIO via bash:
+2. To access MinIO from the command line, I used the following command in the terminal, after accessing the MinIO container via bash:
 
 ```bash
 mc alias set myminio http://localhost:9000 minioadmin minioadmin123
 ```
 
-3. Criei o /data/analytics.duckdb instalei e carreguei o `httpfs`, configurando as variáveis do MinIO, e ativei sua interface usando os comandos abaixo:
+3. I created `/data/analytics.duckdb`, installed and loaded `httpfs`, configured the MinIO variables, and enabled its interface using the commands below:
 
 ```bash
 duckdb /data/analytics.duckdb -ui
@@ -75,7 +77,7 @@ SET s3_use_ssl = false;
 SET s3_url_style='path';
 ```
 
-- Também criei schemas para organizar melhor o banco:
+- I also created schemas to better organize the database:
 
 ```bash
 CREATE SCHEMA IF NOT EXISTS bronze;
@@ -83,7 +85,7 @@ CREATE SCHEMA IF NOT EXISTS silver;
 CREATE SCHEMA IF NOT EXISTS gold;
 ```
 
-4. Para importar os dados e criar o equivalente às external tables do GCS e definir os tipos todos como VARCHAR, eu rodei a query:
+4. To import the data and create the equivalent of GCS's external tables, defining all types as VARCHAR, I ran the query:
 
 ```bash
 CREATE OR REPLACE VIEW bronze.elicitations AS SELECT * FROM read_csv(
@@ -97,7 +99,7 @@ CREATE OR REPLACE VIEW bronze.elicitations AS SELECT * FROM read_csv(
 );
 ```
 
-- Verifiquei com o comando
+- I checked it with the command:
 
 ```bash
 SELECT * FROM bronze.elicitations LIMIT 5;
@@ -114,7 +116,7 @@ SELECT * FROM bronze.elicitations LIMIT 5;
 └─────────┴───────────┴─────────┴─────────────────────┘
 ```
 
-- Adaptei a query para os outros CSV's e ao final, tínhamos essas views:
+- I adapted the query for the other CSVs, and in the end we had these views:
 
 ```bash
 SELECT view_name FROM duckdb_views;
@@ -132,11 +134,11 @@ SELECT view_name FROM duckdb_views;
 └────────────────────┘
 ```
 
-### Camada Prata
+### Silver Layer
 
-5. A partir das views, eu criei as tabelas analíticas `silver.dim_movies` e `silver.fact_ratings`
+5. From the views, I created the analytical tables `silver.dim_movies` and `silver.fact_ratings`.
 
-- Para a `dim_movies`, meu desafio era obter o ano a partir do título para criar a coluna separada de ano de lançamento, e essa foi a consulta que eu construi:
+- For `dim_movies`, my challenge was extracting the year from the title to create a separate release-year column, and this was the query I built:
 
 ```bash
 CREATE OR REPLACE TABLE silver.dim_movies (
@@ -155,7 +157,7 @@ INSERT INTO silver.dim_movies
 ;
 ```
 
-- Esse foi o resultado final:
+- Here's the final result:
 
 ```bash
 SELECT * FROM silver.dim_movies LIMIT 10;
@@ -177,7 +179,7 @@ SELECT * FROM silver.dim_movies LIMIT 10;
 └─────────────────────────────┴─────────────────────────────────────────────┴────────────────┘
 ```
 
-- Para a tabela de `silver.fact_ratings`, meu desafio era unificar as tabelas e fazer uma limpeza no dataset final. Ainda precisei dar uma limpada nesse dataset em específico, porque a coluna ratings deveria vir de 0.5 a 5.0, e haviam valores -1, e como esses dados só representavam 12% do total dos registros totais (somando as duas tabelas originais), não vi problema em deixá-los de fora
+- For the `silver.fact_ratings` table, my challenge was unifying the tables and cleaning up the final dataset. I still had to do some cleanup on this particular dataset, because the rating column was supposed to range from 0.5 to 5.0, but there were -1 values, and since that data only represented 12% of the total records (combining the two original tables), I didn't see a problem leaving them out.
 
 ```bash
 CREATE OR REPLACE TABLE silver.fact_ratings AS
@@ -203,7 +205,7 @@ WHERE TRY_CAST(rating AS DOUBLE) IS NOT NULL
 AND rating <> -1;
 ```
 
-- Esse foi o resultado final:
+- Here's the final result:
 
 ```bash
 SELECT * FROM silver.fact_ratings LIMIT 5;
@@ -220,9 +222,9 @@ SELECT * FROM silver.fact_ratings LIMIT 5;
 └────────┴─────────┴────────┴─────────────────────┘
 ```
 
-### Camada Ouro
+### Gold Layer
 
-6. Com uma mãozinha do Claude, eu montei as queries para as views que seriam consumidas pelo metabase, como solicitado pelo desafio e montei views para cada uma:
+6. With a little help from Claude, I put together the queries for the views that would be consumed by Metabase, as requested by the challenge, building a view for each one:
 
 ```bash
 CREATE OR REPLACE VIEW gold.vw_movie_kpis AS
@@ -310,7 +312,7 @@ ORDER BY media_rating DESC;
 SELECT * FROM gold.vw_genre_performance LIMIT 10;
 ```
 
-7. Em seguida, conectei o Metabase ao banco de dados e fui criando os gráficos (com ajuda do Claude também)
+7. Next, I connected Metabase to the database and started building the charts (with Claude's help here too).
 
 ![](img/dashboard-1.png)
 ![](img/dashboard-2.png)
