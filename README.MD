@@ -86,7 +86,7 @@ CREATE SCHEMA IF NOT EXISTS gold;
 4. Para importar os dados e criar o equivalente às external tables do GCS e definir os tipos todos como VARCHAR, eu rodei a query:
 
 ```bash
-CREATE OR REPLACE VIEW raw.elicitations AS SELECT * FROM read_csv(
+CREATE OR REPLACE VIEW bronze.elicitations AS SELECT * FROM read_csv(
   's3://movie-lens/raw/movie_elicitation_set.csv',
   types = {
     'tstamp':'VARCHAR',
@@ -100,7 +100,7 @@ CREATE OR REPLACE VIEW raw.elicitations AS SELECT * FROM read_csv(
 - Verifiquei com o comando
 
 ```bash
-SELECT * FROM raw.elicitations LIMIT 5;
+SELECT * FROM bronze.elicitations LIMIT 5;
 
 ┌─────────┬───────────┬─────────┬─────────────────────┐
 │ movieId │ month_idx │ source  │       tstamp        │
@@ -150,7 +150,7 @@ INSERT INTO silver.dim_movies
     regexp_replace(title, '\s\(\d{4}\)$', ''),
     genres,
     regexp_extract(title, '\((\d{4})\)$', 1)::INTEGER
-  FROM raw.movies
+  FROM bronze.movies
   WHERE regexp_matches(title, '\(\d{4}\)$');
 ;
 ```
@@ -187,7 +187,7 @@ SELECT
   TRY_CAST(movieId AS VARCHAR) AS movieId,
   TRY_CAST(rating AS DOUBLE) AS rating,
   TRY_CAST(tstamp AS TIMESTAMP) AS tstamp
-FROM raw.ratings
+FROM bronze.ratings
 WHERE TRY_CAST(rating AS DOUBLE) IS NOT NULL
 AND rating <> -1
 
@@ -198,7 +198,7 @@ SELECT
   TRY_CAST(movieId AS VARCHAR) AS movieId,
   TRY_CAST(rating AS DOUBLE) AS rating,
   TRY_CAST(tstamp AS TIMESTAMP) AS tstamp
-FROM raw.additional_ratings
+FROM bronze.additional_ratings
 WHERE TRY_CAST(rating AS DOUBLE) IS NOT NULL
 AND rating <> -1;
 ```
